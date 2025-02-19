@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Live Text Highlighter</title>
+  <style>
+    :root {
+      --text-color: #000000;
+      --background-color: #ffffff;
+      --highlight-bg-color: #1a73e8; /* Google blue */
+      --highlight-text-color: #ffffff;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+      overflow: hidden;
+    }
+    /* Main text container */
+    #text-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 20px;
+      overflow-y: auto;
+      background-color: var(--background-color);
+      color: var(--text-color);
+      line-height: 1.6;
+    }
+    /* Each word gets its own span */
+    .word {
+      white-space: pre;
+    }
+    /* Highlight style applied to words up to the current word */
+    .highlighted {
+      background-color: var(--highlight-bg-color);
+      color: var(--highlight-text-color);
+    }
+    /* Chevron toggle button in top-right */
+    #chevron {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background-color: rgba(0, 0, 0, 0.5);
+      color: #fff;
+      width: 30px;
+      height: 30px;
+      line-height: 30px;
+      text-align: center;
+      border-radius: 4px;
+      cursor: pointer;
+      z-index: 1000;
+      user-select: none;
+    }
+    /* Sidebar styling */
+    #sidebar {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 300px;
+      height: 100%;
+      background-color: #f1f1f1;
+      box-shadow: -2px 0 5px rgba(0, 0, 0, 0.3);
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      z-index: 999;
+      overflow-y: auto;
+      padding: 20px;
+    }
+    #sidebar.open {
+      transform: translateX(0);
+    }
+    #sidebar h2 {
+      margin-top: 0;
+    }
+    #sidebar label {
+      display: block;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    #sidebar textarea {
+      width: 100%;
+      height: 150px;
+    }
+    #sidebar input[type="color"] {
+      width: 100%;
+      height: 30px;
+      border: none;
+      padding: 0;
+      margin-top: 5px;
+    }
+    #apply-btn {
+      margin-top: 15px;
+      width: 100%;
+      padding: 10px;
+      background-color: #1a73e8;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Main text display container -->
+  <div id="text-container">
+    <!-- Text will be injected here -->
+  </div>
+  <!-- Chevron button to toggle sidebar -->
+  <div id="chevron">❯</div>
+  <!-- Sidebar with settings -->
+  <div id="sidebar">
+    <h2>Settings</h2>
+    <label for="text-input">Text:</label>
+    <textarea id="text-input" placeholder="Paste your text here..."></textarea>
+    <label for="text-color">Text Color:</label>
+    <input type="color" id="text-color" value="#000000" />
+    <label for="background-color">Background Color:</label>
+    <input type="color" id="background-color" value="#ffffff" />
+    <label for="highlight-bg-color">Highlight Background Color:</label>
+    <input type="color" id="highlight-bg-color" value="#1a73e8" />
+    <label for="highlight-text-color">Highlight Text Color:</label>
+    <input type="color" id="highlight-text-color" value="#ffffff" />
+    <button id="apply-btn">Apply</button>
+  </div>
+
+  <script>
+    let words = [];
+    let currentWordIndex = 0;
+
+    const textContainer = document.getElementById("text-container");
+    const chevron = document.getElementById("chevron");
+    const sidebar = document.getElementById("sidebar");
+    const applyBtn = document.getElementById("apply-btn");
+
+    // Toggle sidebar visibility on chevron click
+    chevron.addEventListener("click", () => {
+      sidebar.classList.toggle("open");
+    });
+
+    // When settings are applied, update CSS variables and process the text
+    applyBtn.addEventListener("click", () => {
+      const textInput = document.getElementById("text-input").value;
+      const textColor = document.getElementById("text-color").value;
+      const backgroundColor = document.getElementById("background-color").value;
+      const highlightBgColor = document.getElementById("highlight-bg-color").value;
+      const highlightTextColor = document.getElementById("highlight-text-color").value;
+
+      // Update CSS custom properties
+      document.documentElement.style.setProperty("--text-color", textColor);
+      document.documentElement.style.setProperty("--background-color", backgroundColor);
+      document.documentElement.style.setProperty("--highlight-bg-color", highlightBgColor);
+      document.documentElement.style.setProperty("--highlight-text-color", highlightTextColor);
+
+      processText(textInput);
+      // Optionally close the sidebar after applying
+      sidebar.classList.remove("open");
+    });
+
+    // Render the provided text into the main container
+    function processText(text) {
+      // Clear previous content
+      textContainer.innerHTML = "";
+      words = [];
+      if (!text) return;
+      // Split text by whitespace (each token may include punctuation attached to a word)
+      const tokens = text.split(/\s+/);
+      tokens.forEach((token) => {
+        const span = document.createElement("span");
+        span.className = "word";
+        // Append a space after each token for natural spacing
+        span.textContent = token + " ";
+        textContainer.appendChild(span);
+        words.push(span);
+      });
+      // Start at the beginning (first word highlighted)
+      currentWordIndex = 0;
+      updateHighlighting();
+      centerActiveWord();
+    }
+
+    // Utility: Return true if a string is composed solely of punctuation characters.
+    function isPunctuation(str) {
+      return /^[\.,;:!?]+$/.test(str);
+    }
+
+    // Update the highlighting for each word (words up to currentWordIndex are highlighted)
+    function updateHighlighting() {
+      words.forEach((span, index) => {
+        if (index <= currentWordIndex) {
+          span.classList.add("highlighted");
+        } else {
+          span.classList.remove("highlighted");
+        }
+      });
+    }
+
+    // Center the active word's line in the text container
+    function centerActiveWord() {
+      if (!words[currentWordIndex]) return;
+      const activeSpan = words[currentWordIndex];
+      const containerRect = textContainer.getBoundingClientRect();
+      const spanRect = activeSpan.getBoundingClientRect();
+      // Calculate offset so that the vertical center of the active word aligns with container center
+      const offset =
+        (spanRect.top + spanRect.bottom) / 2 -
+        (containerRect.top + containerRect.bottom) / 2;
+      textContainer.scrollTop += offset;
+    }
+
+    // Listen for arrow key events to move the active highlight
+    document.addEventListener("keydown", (e) => {
+      // Avoid interfering with text entry
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+
+      if (e.key === "ArrowRight") {
+        // Move to the next word (skip tokens that are solely punctuation)
+        let nextIndex = currentWordIndex + 1;
+        while (nextIndex < words.length && isPunctuation(words[nextIndex].textContent.trim())) {
+          nextIndex++;
+        }
+        if (nextIndex < words.length) {
+          currentWordIndex = nextIndex;
+          updateHighlighting();
+          centerActiveWord();
+        }
+        e.preventDefault();
+      } else if (e.key === "ArrowLeft") {
+        // Move to the previous word (skipping punctuation-only tokens)
+        let prevIndex = currentWordIndex - 1;
+        while (prevIndex >= 0 && isPunctuation(words[prevIndex].textContent.trim())) {
+          prevIndex--;
+        }
+        if (prevIndex >= 0) {
+          currentWordIndex = prevIndex;
+          updateHighlighting();
+          centerActiveWord();
+        }
+        e.preventDefault();
+      } else if (e.key === "ArrowUp") {
+        // Jump to a word on the previous line
+        const activeSpan = words[currentWordIndex];
+        const activeRect = activeSpan.getBoundingClientRect();
+        let candidate = null;
+        for (let i = currentWordIndex - 1; i >= 0; i--) {
+          const rect = words[i].getBoundingClientRect();
+          if (rect.top < activeRect.top) {
+            candidate = i;
+            break;
+          }
+        }
+        if (candidate !== null) {
+          currentWordIndex = candidate;
+          updateHighlighting();
+          centerActiveWord();
+        }
+        e.preventDefault();
+      } else if (e.key === "ArrowDown") {
+        // Jump to a word on the next line
+        const activeSpan = words[currentWordIndex];
+        const activeRect = activeSpan.getBoundingClientRect();
+        let candidate = null;
+        for (let i = currentWordIndex + 1; i < words.length; i++) {
+          const rect = words[i].getBoundingClientRect();
+          if (rect.top > activeRect.top) {
+            candidate = i;
+            break;
+          }
+        }
+        if (candidate !== null) {
+          currentWordIndex = candidate;
+          updateHighlighting();
+          centerActiveWord();
+        }
+        e.preventDefault();
+      }
+    });
+
+    // Load a default text for demonstration
+    const defaultText =
+      "This is an example text. Use the arrow keys to move the highlight through the words, and adjust settings using the sidebar!";
+    document.getElementById("text-input").value = defaultText;
+    processText(defaultText);
+  </script>
+</body>
+</html>
