@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Live Text Highlighter</title>
   <style>
     :root {
@@ -37,7 +37,7 @@
       white-space: pre-wrap;
       cursor: pointer;
     }
-    /* Highlight style applied to words up to the current word */
+    /* Highlight style applied to words up to currentWordIndex */
     .highlighted {
       background-color: var(--highlight-bg-color);
       color: var(--highlight-text-color);
@@ -177,18 +177,62 @@
     const sidebar = document.getElementById("sidebar");
     const applyBtn = document.getElementById("apply-btn");
 
+    // Load saved preferences from localStorage (or use defaults)
+    function loadPreferences() {
+      const defaultText = "This is an example text.\n\nUse the arrow keys to move the highlight through the words,\nand adjust settings using the sidebar!\n\nClick any word to jump to that word. The first word starts in the middle of the window and remains centered as you progress.";
+      
+      const savedText = localStorage.getItem('lastText');
+      document.getElementById("text-input").value = savedText !== null ? savedText : defaultText;
+      
+      const savedTextColor = localStorage.getItem('textColor');
+      if (savedTextColor !== null) {
+        document.getElementById("text-color").value = savedTextColor;
+        document.documentElement.style.setProperty("--text-color", savedTextColor);
+      }
+      
+      const savedBackgroundColor = localStorage.getItem('backgroundColor');
+      if (savedBackgroundColor !== null) {
+        document.getElementById("background-color").value = savedBackgroundColor;
+        document.documentElement.style.setProperty("--background-color", savedBackgroundColor);
+      }
+      
+      const savedHighlightBgColor = localStorage.getItem('highlightBgColor');
+      if (savedHighlightBgColor !== null) {
+        document.getElementById("highlight-bg-color").value = savedHighlightBgColor;
+        document.documentElement.style.setProperty("--highlight-bg-color", savedHighlightBgColor);
+      }
+      
+      const savedHighlightTextColor = localStorage.getItem('highlightTextColor');
+      if (savedHighlightTextColor !== null) {
+        document.getElementById("highlight-text-color").value = savedHighlightTextColor;
+        document.documentElement.style.setProperty("--highlight-text-color", savedHighlightTextColor);
+      }
+      
+      const savedFontSize = localStorage.getItem('fontSize');
+      if (savedFontSize !== null) {
+        textContainer.style.fontSize = savedFontSize;
+      }
+    }
+
     // Toggle sidebar visibility on chevron click
     chevron.addEventListener("click", () => {
       sidebar.classList.toggle("open");
     });
 
-    // When settings are applied, update CSS variables and process the text
+    // When settings are applied, update CSS properties and store them in localStorage
     applyBtn.addEventListener("click", () => {
       const textInput = document.getElementById("text-input").value;
       const textColor = document.getElementById("text-color").value;
       const backgroundColor = document.getElementById("background-color").value;
       const highlightBgColor = document.getElementById("highlight-bg-color").value;
       const highlightTextColor = document.getElementById("highlight-text-color").value;
+
+      // Save preferences in localStorage
+      localStorage.setItem('lastText', textInput);
+      localStorage.setItem('textColor', textColor);
+      localStorage.setItem('backgroundColor', backgroundColor);
+      localStorage.setItem('highlightBgColor', highlightBgColor);
+      localStorage.setItem('highlightTextColor', highlightTextColor);
 
       // Update CSS custom properties
       document.documentElement.style.setProperty("--text-color", textColor);
@@ -197,22 +241,21 @@
       document.documentElement.style.setProperty("--highlight-text-color", highlightTextColor);
 
       processText(textInput);
-      // Optionally close the sidebar after applying
       sidebar.classList.remove("open");
     });
 
-    // Add event listeners to the text size buttons
+    // Add event listeners to the text size buttons (and save chosen size)
     document.querySelectorAll('.text-size-btn').forEach(btn => {
       btn.addEventListener('click', function() {
-        textContainer.style.fontSize = this.getAttribute('data-size') + 'px';
-        // After font size change, re-center the active word
+        let fontSize = this.getAttribute('data-size') + 'px';
+        textContainer.style.fontSize = fontSize;
+        localStorage.setItem('fontSize', fontSize);
         centerActiveWord();
       });
     });
 
     // Render the provided text into the main container, preserving paragraphs and indents.
     function processText(text) {
-      // Clear previous content
       textContainer.innerHTML = "";
       words = [];
       if (!text) return;
@@ -220,21 +263,18 @@
       const paragraphs = text.split(/\n+/);
       paragraphs.forEach((para) => {
         const pElem = document.createElement("p");
-        // Split paragraph into tokens by whitespace
         const tokens = para.split(/\s+/);
         tokens.forEach((token, index) => {
-          // Skip empty tokens (could happen if there are extra spaces)
-          if(token === "") return;
+          if (token === "") return;
           const span = document.createElement("span");
           span.className = "word";
           span.textContent = token;
-          // Append a space after each token except the last in the paragraph
           if (index !== tokens.length - 1) {
             span.textContent += " ";
           }
-          // Set data-index for double-click event
+          // Save index for click-to-jump functionality
           span.dataset.index = words.length;
-          // Add double-click event to jump to this word
+          // Single-click event to jump to this word
           span.addEventListener("click", function() {
             currentWordIndex = parseInt(this.dataset.index);
             updateHighlighting();
@@ -245,7 +285,6 @@
         });
         textContainer.appendChild(pElem);
       });
-      // Start at the beginning (first word highlighted) and center it
       currentWordIndex = 0;
       updateHighlighting();
       centerActiveWord();
@@ -268,8 +307,7 @@
     }
 
     // Custom smooth scroll function using requestAnimationFrame.
-    // It does not allow interruption: if a new target is requested during animation,
-    // that target is stored in pendingScroll and applied after the current animation completes.
+    // New scroll requests during an animation are queued in pendingScroll.
     function smoothScrollTo(element, target, duration) {
       isScrolling = true;
       let start = element.scrollTop;
@@ -290,7 +328,6 @@
           window.requestAnimationFrame(animateScroll);
         } else {
           isScrolling = false;
-          // After finishing, if a new scroll target was requested, start a new animation.
           if (pendingScroll !== null && Math.abs(pendingScroll - element.scrollTop) > 1) {
             let newTarget = pendingScroll;
             pendingScroll = null;
@@ -302,7 +339,7 @@
     }
 
     // Center the active word's line in the text container.
-    // If an animation is already in progress, update the pendingScroll target.
+    // If an animation is already running, the new target is queued.
     function centerActiveWord() {
       if (!words[currentWordIndex]) return;
       const activeSpan = words[currentWordIndex];
@@ -315,13 +352,10 @@
       }
     }
 
-    // Listen for arrow key events to move the active highlight.
+    // Listen for arrow key events to move the active highlight
     document.addEventListener("keydown", (e) => {
-      // Avoid interfering with text entry.
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
-
       if (e.key === "ArrowRight") {
-        // Move to the next word (skip tokens that are solely punctuation)
         let nextIndex = currentWordIndex + 1;
         while (nextIndex < words.length && isPunctuation(words[nextIndex].textContent.trim())) {
           nextIndex++;
@@ -333,7 +367,6 @@
         }
         e.preventDefault();
       } else if (e.key === "ArrowLeft") {
-        // Move to the previous word (skipping punctuation-only tokens)
         let prevIndex = currentWordIndex - 1;
         while (prevIndex >= 0 && isPunctuation(words[prevIndex].textContent.trim())) {
           prevIndex--;
@@ -345,7 +378,6 @@
         }
         e.preventDefault();
       } else if (e.key === "ArrowUp") {
-        // Jump to a word on the previous line
         const activeSpan = words[currentWordIndex];
         const activeRect = activeSpan.getBoundingClientRect();
         let candidate = null;
@@ -363,7 +395,6 @@
         }
         e.preventDefault();
       } else if (e.key === "ArrowDown") {
-        // Jump to a word on the next line
         const activeSpan = words[currentWordIndex];
         const activeRect = activeSpan.getBoundingClientRect();
         let candidate = null;
@@ -383,11 +414,12 @@
       }
     });
 
-    // Load a default text for demonstration.
-    const defaultText =
-      "This is an example text.\n\nUse the arrow keys to move the highlight through the words,\nand adjust settings using the sidebar!\n\nDouble-click any word to jump to that word. The first word starts in the middle of the window and remains centered as you progress.";
-    document.getElementById("text-input").value = defaultText;
-    processText(defaultText);
+    // On page load, load saved preferences and process the text.
+    window.addEventListener("load", () => {
+      loadPreferences();
+      const textValue = document.getElementById("text-input").value;
+      processText(textValue);
+    });
   </script>
 </body>
 </html>
