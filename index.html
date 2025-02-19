@@ -30,15 +30,22 @@
       color: var(--text-color);
       line-height: 1.6;
       word-wrap: break-word;
+      scroll-behavior: smooth; /* Smooth scrolling animation */
     }
-    /* Each word gets its own span; using pre-wrap so whitespace is preserved yet wrapping occurs */
+    /* Each word gets its own span */
     .word {
       white-space: pre-wrap;
+      cursor: pointer;
     }
     /* Highlight style applied to words up to the current word */
     .highlighted {
       background-color: var(--highlight-bg-color);
       color: var(--highlight-text-color);
+    }
+    /* Paragraph styling with extra spacing and indent */
+    #text-container p {
+      margin: 1em 0;
+      text-indent: 2em;
     }
     /* Chevron toggle button in top-right */
     #chevron {
@@ -201,23 +208,42 @@
       });
     });
 
-    // Render the provided text into the main container
+    // Render the provided text into the main container, preserving paragraphs and indents.
     function processText(text) {
       // Clear previous content
       textContainer.innerHTML = "";
       words = [];
       if (!text) return;
-      // Split text by whitespace (each token may include punctuation attached to a word)
-      const tokens = text.split(/\s+/);
-      tokens.forEach((token) => {
-        const span = document.createElement("span");
-        span.className = "word";
-        // Append a space after each token for natural spacing
-        span.textContent = token + " ";
-        textContainer.appendChild(span);
-        words.push(span);
+      // Split text into paragraphs (split on one or more newlines)
+      const paragraphs = text.split(/\n+/);
+      paragraphs.forEach((para) => {
+        const pElem = document.createElement("p");
+        // Split paragraph into tokens by whitespace
+        const tokens = para.split(/\s+/);
+        tokens.forEach((token, index) => {
+          // Skip empty tokens (could happen if there are extra spaces)
+          if(token === "") return;
+          const span = document.createElement("span");
+          span.className = "word";
+          span.textContent = token;
+          // Append a space after each token except the last in the paragraph
+          if (index !== tokens.length - 1) {
+            span.textContent += " ";
+          }
+          // Set data-index for double-click event
+          span.dataset.index = words.length;
+          // Add double-click event to jump to this word
+          span.addEventListener("dblclick", function() {
+            currentWordIndex = parseInt(this.dataset.index);
+            updateHighlighting();
+            centerActiveWord();
+          });
+          pElem.appendChild(span);
+          words.push(span);
+        });
+        textContainer.appendChild(pElem);
       });
-      // Start at the beginning (first word highlighted)
+      // Start at the beginning (first word highlighted) and center it
       currentWordIndex = 0;
       updateHighlighting();
       centerActiveWord();
@@ -239,12 +265,11 @@
       });
     }
 
-    // Center the active word's line in the text container
+    // Center the active word's line in the text container (smoothly, thanks to CSS)
     function centerActiveWord() {
       if (!words[currentWordIndex]) return;
       const activeSpan = words[currentWordIndex];
       const containerHeight = textContainer.clientHeight;
-      // Calculate the new scrollTop so that activeSpan is centered.
       textContainer.scrollTop = activeSpan.offsetTop - containerHeight / 2 + activeSpan.offsetHeight / 2;
     }
 
@@ -318,7 +343,7 @@
 
     // Load a default text for demonstration
     const defaultText =
-      "This is an example text. Use the arrow keys to move the highlight through the words, and adjust settings using the sidebar! The first word starts in the middle of the window and remains centered as you progress.";
+      "This is an example text.\n\nUse the arrow keys to move the highlight through the words,\nand adjust settings using the sidebar!\n\nDouble-click any word to jump to that word. The first word starts in the middle of the window and remains centered as you progress.";
     document.getElementById("text-input").value = defaultText;
     processText(defaultText);
   </script>
