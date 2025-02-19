@@ -30,7 +30,7 @@
       color: var(--text-color);
       line-height: 1.6;
       word-wrap: break-word;
-      scroll-behavior: smooth; /* Smooth scrolling animation */
+      /* Removed CSS smooth scrolling so we can control it via JS */
     }
     /* Each word gets its own span */
     .word {
@@ -265,12 +265,13 @@
       });
     }
 
-    // Center the active word's line in the text container (smoothly, thanks to CSS)
+    // Center the active word's line in the text container with smooth scrolling
     function centerActiveWord() {
       if (!words[currentWordIndex]) return;
       const activeSpan = words[currentWordIndex];
       const containerHeight = textContainer.clientHeight;
-      textContainer.scrollTop = activeSpan.offsetTop - containerHeight / 2 + activeSpan.offsetHeight / 2;
+      const newScrollTop = activeSpan.offsetTop - containerHeight / 2 + activeSpan.offsetHeight / 2;
+      textContainer.scrollTo({ top: newScrollTop, behavior: "smooth" });
     }
 
     // Listen for arrow key events to move the active highlight
