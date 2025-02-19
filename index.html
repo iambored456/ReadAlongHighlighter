@@ -169,6 +169,8 @@
   <script>
     let words = [];
     let currentWordIndex = 0;
+    let isScrolling = false;    // Flag to track if scroll animation is running
+    let pendingScroll = null;   // Holds a new target if one is requested during animation
 
     const textContainer = document.getElementById("text-container");
     const chevron = document.getElementById("chevron");
@@ -265,12 +267,15 @@
       });
     }
 
-    // Custom smooth scroll function using requestAnimationFrame
+    // Custom smooth scroll function using requestAnimationFrame.
+    // It does not allow interruption: if a new target is requested during animation,
+    // that target is stored in pendingScroll and applied after the current animation completes.
     function smoothScrollTo(element, target, duration) {
+      isScrolling = true;
       let start = element.scrollTop;
       let change = target - start;
       let startTime = null;
-      
+
       function easeInOutQuad(t) {
         return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
       }
@@ -283,24 +288,36 @@
         element.scrollTop = start + change * easedProgress;
         if (elapsed < duration) {
           window.requestAnimationFrame(animateScroll);
+        } else {
+          isScrolling = false;
+          // After finishing, if a new scroll target was requested, start a new animation.
+          if (pendingScroll !== null && Math.abs(pendingScroll - element.scrollTop) > 1) {
+            let newTarget = pendingScroll;
+            pendingScroll = null;
+            smoothScrollTo(element, newTarget, duration);
+          }
         }
       }
       window.requestAnimationFrame(animateScroll);
     }
 
-    // Center the active word's line in the text container with smooth scrolling
+    // Center the active word's line in the text container.
+    // If an animation is already in progress, update the pendingScroll target.
     function centerActiveWord() {
       if (!words[currentWordIndex]) return;
       const activeSpan = words[currentWordIndex];
       const containerHeight = textContainer.clientHeight;
       const newScrollTop = activeSpan.offsetTop - containerHeight / 2 + activeSpan.offsetHeight / 2;
-      // Use our custom smoothScrollTo instead of native scrollTo
-      smoothScrollTo(textContainer, newScrollTop, 400); // 400ms duration
+      if (isScrolling) {
+        pendingScroll = newScrollTop;
+      } else {
+        smoothScrollTo(textContainer, newScrollTop, 400); // 400ms duration
+      }
     }
 
-    // Listen for arrow key events to move the active highlight
+    // Listen for arrow key events to move the active highlight.
     document.addEventListener("keydown", (e) => {
-      // Avoid interfering with text entry
+      // Avoid interfering with text entry.
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
 
       if (e.key === "ArrowRight") {
@@ -366,7 +383,7 @@
       }
     });
 
-    // Load a default text for demonstration
+    // Load a default text for demonstration.
     const defaultText =
       "This is an example text.\n\nUse the arrow keys to move the highlight through the words,\nand adjust settings using the sidebar!\n\nDouble-click any word to jump to that word. The first word starts in the middle of the window and remains centered as you progress.";
     document.getElementById("text-input").value = defaultText;
