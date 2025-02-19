@@ -235,7 +235,7 @@
           // Set data-index for double-click event
           span.dataset.index = words.length;
           // Add double-click event to jump to this word
-          span.addEventListener("dblclick", function() {
+          span.addEventListener("click", function() {
             currentWordIndex = parseInt(this.dataset.index);
             updateHighlighting();
             centerActiveWord();
