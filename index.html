@@ -265,13 +265,37 @@
       });
     }
 
+    // Custom smooth scroll function using requestAnimationFrame
+    function smoothScrollTo(element, target, duration) {
+      let start = element.scrollTop;
+      let change = target - start;
+      let startTime = null;
+      
+      function easeInOutQuad(t) {
+        return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+      }
+
+      function animateScroll(timestamp) {
+        if (!startTime) startTime = timestamp;
+        let elapsed = timestamp - startTime;
+        let progress = Math.min(elapsed / duration, 1);
+        let easedProgress = easeInOutQuad(progress);
+        element.scrollTop = start + change * easedProgress;
+        if (elapsed < duration) {
+          window.requestAnimationFrame(animateScroll);
+        }
+      }
+      window.requestAnimationFrame(animateScroll);
+    }
+
     // Center the active word's line in the text container with smooth scrolling
     function centerActiveWord() {
       if (!words[currentWordIndex]) return;
       const activeSpan = words[currentWordIndex];
       const containerHeight = textContainer.clientHeight;
       const newScrollTop = activeSpan.offsetTop - containerHeight / 2 + activeSpan.offsetHeight / 2;
-      textContainer.scrollTo({ top: newScrollTop, behavior: "smooth" });
+      // Use our custom smoothScrollTo instead of native scrollTo
+      smoothScrollTo(textContainer, newScrollTop, 400); // 400ms duration
     }
 
     // Listen for arrow key events to move the active highlight
